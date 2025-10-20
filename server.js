@@ -1,108 +1,101 @@
-import express from "express";
-import bodyParser from "body-parser";
-import crypto from "crypto";
-import { Low } from "lowdb";
-import { JSONFile } from "lowdb/node";
-import _ from "lodash";
+import { Low } from 'lowdb'
+import { JSONFile } from 'lowdb/node'
+import crypto from 'crypto'
+import express from 'express'
+import cors from 'cors'
 
-const app = express();
-app.use(bodyParser.json());
+const app = express()
+app.use(cors())
+app.use(express.json())
 
-const adapter = new JSONFile("db.json");
-const db = new Low(adapter, { strings: [] }); 
+// --- Database setup ---
+const adapter = new JSONFile('db.json')
 
-await db.read();
-db.data ||= { strings: [] }; 
+// Provide default structure here 👇
+const defaultData = { strings: [] }
 
-// Helper functions
+const db = new Low(adapter, defaultData)
+await db.read()
+db.data ||= { strings: [] }
+
+// --- Helper function ---
 const analyzeString = (value) => {
-  const length = value.length;
-  const normalized = value.toLowerCase().replace(/\s+/g, "");
-  const is_palindrome = normalized === normalized.split("").reverse().join("");
-  const unique_characters = new Set(value).size;
-  const word_count = value.trim().split(/\s+/).length;
-  const sha256_hash = crypto.createHash("sha256").update(value).digest("hex");
-  const character_frequency_map = {};
-
-  for (const char of value) {
-    character_frequency_map[char] = (character_frequency_map[char] || 0) + 1;
+  const clean = value.toLowerCase()
+  const is_palindrome = clean === clean.split('').reverse().join('')
+  const length = value.length
+  const word_count = value.trim().split(/\s+/).length
+  const unique_characters = new Set(clean).size
+  const character_frequency_map = {}
+  for (const char of clean) {
+    character_frequency_map[char] = (character_frequency_map[char] || 0) + 1
   }
+
+  const sha256_hash = crypto.createHash('sha256').update(value).digest('hex')
 
   return {
-    length,
-    is_palindrome,
-    unique_characters,
-    word_count,
-    sha256_hash,
-    character_frequency_map,
-  };
-};
-
-// --- POST /strings ---
-app.post("/strings", async (req, res) => {
-  const { value } = req.body;
-
-  if (!value || typeof value !== "string") {
-    return res.status(400).json({ error: 'Invalid "value" field' });
-  }
-
-  const sha256_hash = crypto.createHash("sha256").update(value).digest("hex");
-  const existing = db.data.strings.find((s) => s.id === sha256_hash);
-  if (existing) return res.status(409).json({ error: "String already exists" });
-
-  const properties = analyzeString(value);
-  const entry = {
     id: sha256_hash,
     value,
-    properties,
+    properties: {
+      length,
+      is_palindrome,
+      unique_characters,
+      word_count,
+      sha256_hash,
+      character_frequency_map,
+    },
     created_at: new Date().toISOString(),
-  };
+  }
+}
 
-  db.data.strings.push(entry);
-  await db.write();
+// --- POST /strings ---
+app.post('/strings', async (req, res) => {
+  const { value } = req.body
+  if (!value) return res.status(422).json({ error: "Missing 'value' field" })
 
-  res.status(201).json(entry);
-});
+  const existing = db.data.strings.find((s) => s.value === value)
+  if (existing) return res.status(409).json({ error: 'Duplicate string' })
 
-// --- GET /strings/:string_value ---
-app.get("/strings/:string_value", (req, res) => {
-  const { string_value } = req.params;
-  const found = db.data.strings.find((s) => s.value === string_value);
-  if (!found) return res.status(404).json({ error: "String not found" });
-  res.json(found);
-});
+  const analyzed = analyzeString(value)
+  db.data.strings.push(analyzed)
+  await db.write()
+  res.status(201).json(analyzed)
+})
 
-// --- GET /strings ---
+// --- GET /strings/:value ---
+app.get('/strings/:value', (req, res) => {
+  const { value } = req.params
+  const string = db.data.strings.find((s) => s.value === value)
+  if (!string) return res.status(404).json({ error: 'String not found' })
+  res.json(string)
+})
+
+// --- GET /strings (all or with filters) ---
 app.get("/strings", (req, res) => {
-  const { is_palindrome, min_length, max_length, word_count, contains_character } = req.query;
   let results = db.data.strings;
 
-  if (is_palindrome !== undefined) {
-    results = results.filter((s) => s.properties.is_palindrome === (is_palindrome === "true"));
-  }
-  if (min_length) results = results.filter((s) => s.properties.length >= Number(min_length));
-  if (max_length) results = results.filter((s) => s.properties.length <= Number(max_length));
-  if (word_count) results = results.filter((s) => s.properties.word_count === Number(word_count));
-  if (contains_character) results = results.filter((s) => s.value.includes(contains_character));
+  const { is_palindrome, min_length, max_length } = req.query;
 
-  res.json({
-    data: results,
-    count: results.length,
-    filters_applied: req.query,
-  });
+  if (is_palindrome !== undefined)
+    results = results.filter(
+      (s) => s.properties.is_palindrome === (is_palindrome === "true")
+    );
+
+  if (min_length) results = results.filter((s) => s.properties.length >= +min_length);
+  if (max_length) results = results.filter((s) => s.properties.length <= +max_length);
+
+  res.json(results);
 });
 
-// --- DELETE /strings/:string_value ---
-app.delete("/strings/:string_value", async (req, res) => {
-  const { string_value } = req.params;
-  const index = db.data.strings.findIndex((s) => s.value === string_value);
-  if (index === -1) return res.status(404).json({ error: "String not found" });
+// --- DELETE /strings/:value ---
+app.delete('/strings/:value', async (req, res) => {
+  const { value } = req.params
+  const index = db.data.strings.findIndex((s) => s.value === value)
+  if (index === -1) return res.status(404).json({ error: 'String not found' })
+  db.data.strings.splice(index, 1)
+  await db.write()
+  res.json({ message: 'Deleted successfully' })
+})
 
-  db.data.strings.splice(index, 1);
-  await db.write();
-  res.status(204).end();
-});
-
-// --- Start Server ---
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+// --- Start server ---
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`))
