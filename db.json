@@ -1,0 +1,50 @@
+{
+  "strings": [
+    {
+      "id": "b894d9e661b90f7c83bbef556087ed2e60ce054e3d5e008a6c76364aa7a15c36",
+      "value": "Temidayo",
+      "properties": {
+        "length": 8,
+        "is_palindrome": false,
+        "unique_characters": 8,
+        "word_count": 1,
+        "sha256_hash": "b894d9e661b90f7c83bbef556087ed2e60ce054e3d5e008a6c76364aa7a15c36",
+        "character_frequency_map": {
+          "T": 1,
+          "e": 1,
+          "m": 1,
+          "i": 1,
+          "d": 1,
+          "a": 1,
+          "y": 1,
+          "o": 1
+        }
+      },
+      "created_at": "2025-10-20T15:15:51.220Z"
+    },
+    {
+      "id": "cef61652741d3ce926712a7d3bd01b6758a4fe2147b185d03b2d2ad7a7e8cf20",
+      "value": "Mofiyinfoluwa",
+      "properties": {
+        "length": 13,
+        "is_palindrome": false,
+        "unique_characters": 10,
+        "word_count": 1,
+        "sha256_hash": "cef61652741d3ce926712a7d3bd01b6758a4fe2147b185d03b2d2ad7a7e8cf20",
+        "character_frequency_map": {
+          "M": 1,
+          "o": 2,
+          "f": 2,
+          "i": 2,
+          "y": 1,
+          "n": 1,
+          "l": 1,
+          "u": 1,
+          "w": 1,
+          "a": 1
+        }
+      },
+      "created_at": "2025-10-20T16:23:44.087Z"
+    }
+  ]
+}
